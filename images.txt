@@ -1,4 +1,3 @@
---platform = linux/amd64
 python
 alpine
 homeassistant/amd64-addon-mosquitto
