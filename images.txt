@@ -45,12 +45,6 @@ maven
 telegraf
 ghost
 owncloud
-buildpack
-adminer
-websphere-liberty
-gcc
-ros
 znc
-r-base
 php-zendserver
 ubuntu-upstart
