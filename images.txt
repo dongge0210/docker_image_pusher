@@ -40,7 +40,6 @@ memcached
 golang
 traefik
 rabbitmq
-elasticsearch
 ruby
 logstash
 java
