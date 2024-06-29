@@ -17,7 +17,7 @@ nextcloud
 hslr/xiaomi-camera-merge
 hslr/sun-panel
 busybox
-httpd:
+httpd
 openjdk
 php
 haproxy
