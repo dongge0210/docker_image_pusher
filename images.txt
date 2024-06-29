@@ -41,7 +41,6 @@ golang
 traefik
 rabbitmq
 ruby
-logstash
 java
 tomcat
 maven
