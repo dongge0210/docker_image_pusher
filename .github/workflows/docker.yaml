@@ -11,6 +11,9 @@ env:
   ALIYUN_NAME_SPACE: "${{ secrets.ALIYUN_NAME_SPACE }}"
   ALIYUN_REGISTRY_USER: "${{ secrets.ALIYUN_REGISTRY_USER }}"
   ALIYUN_REGISTRY_PASSWORD: "${{ secrets.ALIYUN_REGISTRY_PASSWORD }}"
+  HUBDOCKER_USER: "${{ secrets.HUBDOCKER_USER }}"
+  HUBDOCKER_PASSWORD: "${{ secrets.HUBDOCKER_PASSWORD }}"
+
 
 jobs:
 
@@ -54,6 +57,10 @@ jobs:
 
     - name: Docker Setup Buildx
       uses: docker/setup-buildx-action@v3
+
+    - name: Docker login hub-docker-com
+      run: |
+        docker login -u $HUBDOCKER_USER -p $HUBDOCKER_PASSWORD
 
     - name: Build and push image Aliyun
       run: |
