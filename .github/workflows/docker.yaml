@@ -2,30 +2,36 @@ name: Docker CI/CD
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   workflow_dispatch:
     inputs:
       DOCKER_LOGIN_YN:
-        description: '是否登录 Docker Hub (1 为登录，0 为不登录)'
+        description: '手动触发时选择是否登录 Docker Hub (1 登录，0 不登录)'
         required: false
+        # 默认情况下不登录 Docker Hub
+        default: '0'
 
+# 设置环境变量，从 GitHub Secrets 中获取
 env:
   ALIYUN_REGISTRY: ${{ secrets.ALIYUN_REGISTRY }}
   ALIYUN_NAME_SPACE: ${{ secrets.ALIYUN_NAME_SPACE }}
   ALIYUN_REGISTRY_USER: ${{ secrets.ALIYUN_REGISTRY_USER }}
   ALIYUN_REGISTRY_PASSWORD: ${{ secrets.ALIYUN_REGISTRY_PASSWORD }}
+  # 从 Secrets 获取 HUBDOCKER_USER 和 HUBDOCKER_PASSWORD
   HUBDOCKER_USER: ${{ secrets.HUBDOCKER_USER }}
   HUBDOCKER_PASSWORD: ${{ secrets.HUBDOCKER_PASSWORD }}
-  DOCKER_LOGIN_YN: ${{ github.event.inputs.DOCKER_LOGIN_YN || '0' }}
+  # 根据 Secrets 中的 DOCKER_LOGIN_YN 决定是否登录 Docker Hub
+  DOCKER_LOGIN_YN: ${{ secrets.DOCKER_LOGIN_YN }}
 
 jobs:
-  build:
+  build-and-push:
     name: Pull and Push Docker Images
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
+      with:
+        fetch-depth: 1  # 检出最新的代码
 
     - name: Maximize build space
       uses: easimon/maximize-build-space@master
@@ -37,60 +43,48 @@ jobs:
         build-mount-path: '/var/lib/docker/'
 
     - name: Restart Docker
-      run: sudo service docker restart
+      run: sudo service docker restart  # 重启 Docker 服务
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      uses: docker/setup-buildx-action@v3  # 设置 Docker Buildx
 
+    # 根据 DOCKER_LOGIN_YN 环境变量决定是否登录 Docker Hub
     - name: Docker Login for Hub Docker
       if: ${{ env.DOCKER_LOGIN_YN == '1' }}
-      run: echo $HUBDOCKER_PASSWORD | docker login -u $HUBDOCKER_USER --password-stdin
+      run: |
+        echo "Logging into Docker Hub as ${HUBDOCKER_USER}"
+        echo "${HUBDOCKER_PASSWORD}" | docker login -u "${HUBDOCKER_USER}" --password-stdin
 
+    # 总是执行登录阿里云 Registry 的步骤
     - name: Docker Login for Aliyun Registry
-      run: echo $ALIYUN_REGISTRY_PASSWORD | docker login -u $ALIYUN_REGISTRY_USER --password-stdin $ALIYUN_REGISTRY
+      run: |
+        echo "Logging into Aliyun Registry as ${ALIYUN_REGISTRY_USER}"
+        echo "${ALIYUN_REGISTRY_PASSWORD}" | docker login -u "${ALIYUN_REGISTRY_USER}" --password-stdin "${ALIYUN_REGISTRY}"
 
+    # 从 images.txt 读取 Docker 镜像列表并处理
     - name: Read images.txt and process images
       run: |
-        declare -A duplicate_images
-        declare -A temp_map
+        # 读取 images.txt 文件
+        while IFS= read -r image || [ -n "$image" ]; do
+          # 拉取镜像
+          echo "Pulling Docker image: $image"
+          docker pull "$image"
 
-        # Read images from images.txt and preprocess data
-        while IFS= read -r line || [ -n "$line" ]; do
-          if [[ -z "$line" ]] || [[ "$line" =~ ^#.* ]]; then
-            continue
-          fi
-          image_name=$(echo "$line" | awk -F'/' '{print $NF}')
-          image_namespace=$(echo "$line" | awk -F'/' '{if (NF>1) print $1}')
-          
-          if [[ -n "${temp_map[$image_name]}" && "${temp_map[$image_name]}" != "$image_namespace" ]]; then
-            duplicate_images[$image_name]="true"
-          else
-            temp_map[$image_name]=$image_namespace
-          fi
-        done < images.txt
+          # 构造新的镜像名称，包括阿里云的 Registry 和 Namespace
+          new_image_name="${ALIYUN_REGISTRY}/${ALIYUN_NAME_SPACE}/$image"
 
-        # Pull, tag, and push images, handle duplicates
-        while IFS= read -r line || [ -n "$line" ]; do
-          if [[ -z "$line" ]] || [[ "$line" =~ ^#.* ]]; then
-            continue
-          fi
-          echo "Processing $line"
-          image_name_tag=$(echo "$line" | awk -F'/' '{print $NF}')
-          image_namespace=$(echo "$line" | awk -F'/' '{if (NF>1) print $1}')
+          # 标记镜像
+          echo "Tagging image as: $new_image_name"
+          docker tag "$image" "$new_image_name"
 
-          if [[ -n "${duplicate_images[$image_name_tag]}" && -n "$image_namespace" ]]; then
-            new_image_name="$ALIYUN_REGISTRY/$ALIYUN_NAME_SPACE/${image_namespace}_${image_name_tag}"
-          else
-            new_image_name="$ALIYUN_REGISTRY/$ALIYUN_NAME_SPACE/$image_name_tag"
-          fi
-
-          docker pull "$line"
-          docker tag "$line" "$new_image_name"
+          # 推送镜像到阿里云 Registry
+          echo "Pushing image to Aliyun Registry: $new_image_name"
           docker push "$new_image_name"
 
-          # Clean up
-          docker rmi "$line" "$new_image_name"
+          # 清理本地镜像
+          echo "Cleaning up local images: $image and $new_image_name"
+          docker rmi "$image" "$new_image_name"
         done < images.txt
 
     - name: Display Disk Usage
-      run: df -h
+      run: df -h  # 显示磁盘使用情况
