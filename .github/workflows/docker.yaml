@@ -1,28 +1,27 @@
-name: Docker Image Management
+name: Docker CI/CD
 
 on:
-  workflow_dispatch:
-    inputs:
-      DOCKER_LOGIN_YN: 
-        description: '是否登录 Docker Hub (0 为不登录，1 为登录)'
-        required: false
-        default: '0'
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      DOCKER_LOGIN_YN:
+        description: '是否登录 Docker Hub (1 为登录，0 为不登录)'
+        required: false
 
 env:
   ALIYUN_REGISTRY: ${{ secrets.ALIYUN_REGISTRY }}
   ALIYUN_NAME_SPACE: ${{ secrets.ALIYUN_NAME_SPACE }}
   ALIYUN_REGISTRY_USER: ${{ secrets.ALIYUN_REGISTRY_USER }}
   ALIYUN_REGISTRY_PASSWORD: ${{ secrets.ALIYUN_REGISTRY_PASSWORD }}
-  DOCKER_LOGIN_YN: ${{ github.event.inputs.DOCKER_LOGIN_YN || '0' }}
   HUBDOCKER_USER: ${{ secrets.HUBDOCKER_USER }}
   HUBDOCKER_PASSWORD: ${{ secrets.HUBDOCKER_PASSWORD }}
+  DOCKER_LOGIN_YN: ${{ github.event.inputs.DOCKER_LOGIN_YN || '0' }}
 
 jobs:
-  build-and-push:
-    name: Build and Push Images
+  build:
+    name: Pull and Push Docker Images
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
@@ -40,44 +39,57 @@ jobs:
     - name: Restart Docker
       run: sudo service docker restart
 
-    - name: Docker Setup Buildx
+    - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
-    - name: Docker Login to Docker Hub
-      if: env.DOCKER_LOGIN_YN == '1'
-      run: echo "${{ secrets.HUBDOCKER_PASSWORD }}" | docker login -u "${{ secrets.HUBDOCKER_USER }}" --password-stdin
+    - name: Docker Login for Hub Docker
+      if: ${{ env.DOCKER_LOGIN_YN == '1' }}
+      run: echo $HUBDOCKER_PASSWORD | docker login -u $HUBDOCKER_USER --password-stdin
 
-    - name: Docker Login to Aliyun Registry
-      run: echo "$ALIYUN_REGISTRY_PASSWORD" | docker login -u "$ALIYUN_REGISTRY_USER" --password-stdin "$ALIYUN_REGISTRY"
+    - name: Docker Login for Aliyun Registry
+      run: echo $ALIYUN_REGISTRY_PASSWORD | docker login -u $ALIYUN_REGISTRY_USER --password-stdin $ALIYUN_REGISTRY
 
-    - name: Process Images from images.txt
+    - name: Read images.txt and process images
       run: |
-        # 读取 images.txt 并处理每行
-        while IFS= read -r image_line || [ -n "$image_line" ]; do
-          # 忽略空行和注释
-          echo "$image_line" | grep -qE '^\s*(#|$)' && continue
+        declare -A duplicate_images
+        declare -A temp_map
 
-          # 处理镜像名称，如果包含冒号则分割命名空间和镜像名
-          if [[ "$image_line" == *":"* ]]; then
-            namespace_and_image=($image_line)
-            image_name="${namespace_and_image[1]}"
+        # Read images from images.txt and preprocess data
+        while IFS= read -r line || [ -n "$line" ]; do
+          if [[ -z "$line" ]] || [[ "$line" =~ ^#.* ]]; then
+            continue
+          fi
+          image_name=$(echo "$line" | awk -F'/' '{print $NF}')
+          image_namespace=$(echo "$line" | awk -F'/' '{if (NF>1) print $1}')
+          
+          if [[ -n "${temp_map[$image_name]}" && "${temp_map[$image_name]}" != "$image_namespace" ]]; then
+            duplicate_images[$image_name]="true"
           else
-            image_name="$image_line"
+            temp_map[$image_name]=$image_namespace
+          fi
+        done < images.txt
+
+        # Pull, tag, and push images, handle duplicates
+        while IFS= read -r line || [ -n "$line" ]; do
+          if [[ -z "$line" ]] || [[ "$line" =~ ^#.* ]]; then
+            continue
+          fi
+          echo "Processing $line"
+          image_name_tag=$(echo "$line" | awk -F'/' '{print $NF}')
+          image_namespace=$(echo "$line" | awk -F'/' '{if (NF>1) print $1}')
+
+          if [[ -n "${duplicate_images[$image_name_tag]}" && -n "$image_namespace" ]]; then
+            new_image_name="$ALIYUN_REGISTRY/$ALIYUN_NAME_SPACE/${image_namespace}_${image_name_tag}"
+          else
+            new_image_name="$ALIYUN_REGISTRY/$ALIYUN_NAME_SPACE/$image_name_tag"
           fi
 
-          # 拉取镜像
-          echo "Pulling Docker image: $image_line"
-          docker pull "$image_line"
-
-          # 打标签并推送到阿里云镜像仓库
-          new_image_name="${ALIYUN_REGISTRY}/${ALIYUN_NAME_SPACE}/${image_name}"
-          echo "Tagging and pushing to Aliyun registry: $new_image_name"
-          docker tag "$image_line" "$new_image_name"
+          docker pull "$line"
+          docker tag "$line" "$new_image_name"
           docker push "$new_image_name"
 
-          # 清理镜像
-          echo "Cleaning up local images: $image_line and $new_image_name"
-          docker rmi "$image_line" "$new_image_name"
+          # Clean up
+          docker rmi "$line" "$new_image_name"
         done < images.txt
 
     - name: Display Disk Usage
