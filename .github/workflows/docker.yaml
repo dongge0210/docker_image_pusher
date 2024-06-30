@@ -82,10 +82,20 @@ jobs:
           docker push "$new_image_name"
 
           # 清理本地镜像
-          echo "正在清理本地镜像：$image_line 和 $new_image_name"
-          docker rmi "$image_line" "$new_image_name"
-
-          # 显示磁盘空间大小
-          echo "清理后的磁盘空间大小:"
-          df -h
+          echo "Cleaning up local images: $image and $new_image_name"
+          docker rmi "$image" "$new_image_name"
         done < images.txt
+
+    - name: Display Disk Usage
+      run: df -h  # 显示磁盘使用情况
+
+    - name: Display files Usage
+      run: cd /dev/root #现实各个盘的文件使用情况
+           ls -l
+           cd /dev/mapper/buildvg-buildl
+           ls -l
+           cd /dev/sdb1
+           ls -l
+           cd /dev/sda15
+           ls -l
+           cd /
