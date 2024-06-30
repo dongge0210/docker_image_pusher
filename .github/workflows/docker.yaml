@@ -94,8 +94,3 @@ jobs:
            ls -l
            cd /dev/mapper/buildvg-buildl
            ls -l
-           cd /dev/sdb1
-           ls -l
-           cd /dev/sda15
-           ls -l
-           cd /
