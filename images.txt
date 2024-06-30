@@ -47,4 +47,4 @@ ghost
 owncloud
 znc
 php-zendserver
-ubuntu-upstart
+gcc
