@@ -82,9 +82,10 @@ jobs:
           docker push "$new_image_name"
 
           # 清理本地镜像
-          echo "Cleaning up local images: $image and $new_image_name"
-          docker rmi "$image" "$new_image_name"
-        done < images.txt
+          echo "正在清理本地镜像：$image_line 和 $new_image_name"
+          docker rmi "$image_line" "$new_image_name"
 
-    - name: Display Disk Usage
-      run: df -h  # 显示磁盘使用情况
+          # 显示磁盘空间大小
+          echo "清理后的磁盘空间大小:"
+          df -h
+        done < images.txt
