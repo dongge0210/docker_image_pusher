@@ -90,7 +90,5 @@ jobs:
       run: df -h  # 显示磁盘使用情况
 
     - name: Display files Usage
-      run: cd /dev/root #现实各个盘的文件使用情况
-           ls -l
-           cd /dev/mapper/buildvg-buildl
+      run: cd /dev/mapper/buildvg-buildl #现实文件使用情况
            ls -l
