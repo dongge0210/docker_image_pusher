@@ -1,3 +1,4 @@
+redis
 python
 alpine
 homeassistant/amd64-addon-mosquitto
