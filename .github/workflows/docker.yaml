@@ -59,7 +59,7 @@ jobs:
       uses: docker/setup-buildx-action@v3  # 设置 Docker Buildx
 
     # 根据 DOCKER_LOGIN_YN 环境变量决定是否登录 Docker Hub
-    - name: Docker Login for Hub Docker
+    - name: Docker Login for Docker Hub
       if: ${{ env.DOCKER_LOGIN_YN == '1' }}
       run: |
         echo "Logging into Docker Hub as ${HUBDOCKER_USER}"
