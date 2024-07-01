@@ -28,6 +28,13 @@ jobs:
     name: Pull and Push Docker Images
     runs-on: ubuntu-latest
     steps:
+    - name: Before freeing up disk space
+      run: |
+        echo "Before freeing up disk space"
+        echo "=============================================================================="
+        df -hT
+        echo "=============================================================================="
+        
     - name: Checkout code
       uses: actions/checkout@v3
       with:
