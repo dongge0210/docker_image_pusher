@@ -164,6 +164,8 @@ jobs:
             docker rmi $new_image
             echo "磁盘空间清理完毕"
 
+         done < images.txt
+
     - name: Display Disk Usage
       run: df -h  # 显示磁盘使用情况
 
