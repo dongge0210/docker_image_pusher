@@ -1,4 +1,4 @@
-name: Docker CI/CD
+name: Docker
 
 on:
   push:
@@ -31,6 +31,7 @@ jobs:
     - name: Before freeing up disk space
       run: |
         echo "Before freeing up disk space"
+        echo "在运行前清空磁盘空间"
         echo "=============================================================================="
         df -hT
         echo "=============================================================================="
@@ -160,6 +161,12 @@ jobs:
             echo "=============================================================================="
             df -hT
             echo "=============================================================================="
+            echo "将镜像事先存放到 [ main ]"
+            echo "=============================================================================="
+            git pull $image main/doc
+            git pull $new_image main/doc
+            echo "=============================================================================="
+            echo "存放完成"
             docker rmi $image
             docker rmi $new_image
             echo "磁盘空间清理完毕"
@@ -171,6 +178,3 @@ jobs:
 
     - name: Display files Usage
       run: ls -l #现实文件使用情况
-
-    - name: Pull code from remote
-      run: git pull origin main --ff-only
