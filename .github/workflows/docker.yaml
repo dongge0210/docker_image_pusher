@@ -172,5 +172,3 @@ jobs:
     - name: Display Disk Usage
       run: df -h  # 显示磁盘使用情况
 
-    - name: Display files Usage
-      run: ls -l #现实文件使用情况
